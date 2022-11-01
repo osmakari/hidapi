@@ -90,6 +90,7 @@ static HidD_GetProductString_ HidD_GetProductString;
 static HidD_SetFeature_ HidD_SetFeature;
 static HidD_GetFeature_ HidD_GetFeature;
 static HidD_GetInputReport_ HidD_GetInputReport;
+static HidD_SetOutputReport_ HidD_SetOutputReport;
 static HidD_GetIndexedString_ HidD_GetIndexedString;
 static HidD_GetPreparsedData_ HidD_GetPreparsedData;
 static HidD_FreePreparsedData_ HidD_FreePreparsedData;
@@ -143,6 +144,7 @@ static int lookup_functions()
 	RESOLVE(hid_lib_handle, HidD_SetFeature);
 	RESOLVE(hid_lib_handle, HidD_GetFeature);
 	RESOLVE(hid_lib_handle, HidD_GetInputReport);
+	RESOLVE(hid_lib_handle, HidD_SetOutputReport);
 	RESOLVE(hid_lib_handle, HidD_GetIndexedString);
 	RESOLVE(hid_lib_handle, HidD_GetPreparsedData);
 	RESOLVE(hid_lib_handle, HidD_FreePreparsedData);
@@ -1159,6 +1161,17 @@ int HID_API_EXPORT HID_API_CALL hid_get_input_report(hid_device *dev, unsigned c
 {
 	/* We could use HidD_GetInputReport() instead, but it doesn't give us an actual length, unfortunately */
 	return hid_get_report(dev, IOCTL_HID_GET_INPUT_REPORT, data, length);
+}
+
+int HID_API_EXPORT HID_API_CALL hid_set_output_report(hid_device *dev, unsigned char *data, size_t length)
+{
+	/* Fix for windows/ble. Send output report with HidD_SetOutputReport() */
+	BOOL s = HidD_SetOutputReport(dev->device_handle, data, length);
+	if(!s) {
+		register_string_error(dev, L"Output report write fail");
+		return -1;
+	}
+	return length;
 }
 
 void HID_API_EXPORT HID_API_CALL hid_close(hid_device *dev)

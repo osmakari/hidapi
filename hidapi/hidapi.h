@@ -468,6 +468,29 @@ extern "C" {
 		*/
 		int HID_API_EXPORT HID_API_CALL hid_get_input_report(hid_device *dev, unsigned char *data, size_t length);
 
+		/** @brief Set an output report to a HID device.
+
+			Set the first byte of @p data[] to the Report ID of the
+			report to be written. Make sure to allow space for this
+			extra byte in @p data[].
+
+			@ingroup API
+			@param dev A device handle returned from hid_open().
+			@param data A buffer to be sent, including
+				the Report ID. Set the first byte of @p data[] to the
+				Report ID of the report to be sent, or set it to zero
+				if your device does not use numbered reports.
+			@param length The number of bytes to written, including an
+				extra byte for the report ID.
+
+			@returns
+				This function returns the number of bytes read plus
+				one for the report ID (which is still in the first
+				byte), or -1 on error.
+				Call hid_error(dev) to get the failure reason.
+		*/
+		int HID_API_EXPORT HID_API_CALL hid_set_output_report(hid_device *dev, unsigned char *data, size_t length);
+
 		/** @brief Close a HID device.
 
 			@ingroup API
