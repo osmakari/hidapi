@@ -467,7 +467,7 @@ extern "C" {
 				Call hid_error(dev) to get the failure reason.
 		*/
 		int HID_API_EXPORT HID_API_CALL hid_get_input_report(hid_device *dev, unsigned char *data, size_t length);
-
+#ifdef _WIN32
 		/** @brief Set an output report to a HID device.
 
 			Set the first byte of @p data[] to the Report ID of the
@@ -490,6 +490,7 @@ extern "C" {
 				Call hid_error(dev) to get the failure reason.
 		*/
 		int HID_API_EXPORT HID_API_CALL hid_set_output_report(hid_device *dev, unsigned char *data, size_t length);
+#endif
 
 		/** @brief Close a HID device.
 
