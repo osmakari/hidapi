@@ -403,7 +403,7 @@ static int parse_hid_vid_pid_from_uevent(const char *uevent, unsigned *bus_type,
 	size_t uevent_len = strlen(uevent);
 	if (uevent_len > sizeof(tmp) - 1)
 		uevent_len = sizeof(tmp) - 1;
-	memcpy(tmp, uevent, sizeof(tmp));
+	memcpy(tmp, uevent, uevent_len);
 	tmp[uevent_len] = '\0';
 
 	char *saveptr = NULL;
@@ -481,6 +481,28 @@ static int parse_hid_vid_pid_from_sysfs(const char *sysfs_path, unsigned *bus_ty
 	return res;
 }
 
+static int get_hid_report_descriptor_from_hidraw(hid_device *dev, struct hidraw_report_descriptor *rpt_desc)
+{
+	int desc_size = 0;
+
+	/* Get Report Descriptor Size */
+	int res = ioctl(dev->device_handle, HIDIOCGRDESCSIZE, &desc_size);
+	if (res < 0) {
+		register_device_error_format(dev, "ioctl(GRDESCSIZE): %s", strerror(errno));
+		return res;
+	}
+
+	/* Get Report Descriptor */
+	memset(rpt_desc, 0x0, sizeof(*rpt_desc));
+	rpt_desc->size = desc_size;
+	res = ioctl(dev->device_handle, HIDIOCGRDESC, rpt_desc);
+	if (res < 0) {
+		register_device_error_format(dev, "ioctl(GRDESC): %s", strerror(errno));
+	}
+
+	return res;
+}
+
 /*
  * The caller is responsible for free()ing the (newly-allocated) character
  * strings pointed to by serial_number_utf8 and product_name_utf8 after use.
@@ -493,7 +515,7 @@ static int parse_uevent_info(const char *uevent, unsigned *bus_type,
 	size_t uevent_len = strlen(uevent);
 	if (uevent_len > sizeof(tmp) - 1)
 		uevent_len = sizeof(tmp) - 1;
-	memcpy(tmp, uevent, sizeof(tmp));
+	memcpy(tmp, uevent, uevent_len);
 	tmp[uevent_len] = '\0';
 
 	char *saveptr = NULL;
@@ -593,6 +615,7 @@ static struct hid_device_info * create_device_info_for_device(struct udev_device
 		case BUS_BLUETOOTH:
 		case BUS_I2C:
 		case BUS_USB:
+		case BUS_SPI:
 			break;
 
 		default:
@@ -678,6 +701,14 @@ static struct hid_device_info * create_device_info_for_device(struct udev_device
 			cur_dev->product_string = utf8_to_wchar_t(product_name_utf8);
 
 			cur_dev->bus_type = HID_API_BUS_I2C;
+
+			break;
+
+		case BUS_SPI:
+			cur_dev->manufacturer_string = wcsdup(L"");
+			cur_dev->product_string = utf8_to_wchar_t(product_name_utf8);
+
+			cur_dev->bus_type = HID_API_BUS_SPI;
 
 			break;
 
@@ -1224,6 +1255,25 @@ int HID_API_EXPORT_CALL hid_get_indexed_string(hid_device *dev, int string_index
 	register_device_error(dev, "hid_get_indexed_string: not supported by hidraw");
 
 	return -1;
+}
+
+
+int HID_API_EXPORT_CALL hid_get_report_descriptor(hid_device *dev, unsigned char *buf, size_t buf_size)
+{
+	struct hidraw_report_descriptor rpt_desc;
+	int res = get_hid_report_descriptor_from_hidraw(dev, &rpt_desc);
+	if (res < 0) {
+		/* error already registered */
+		return res;
+	}
+
+	if (rpt_desc.size < buf_size) {
+		buf_size = (size_t) rpt_desc.size;
+	}
+
+	memcpy(buf, rpt_desc.value, buf_size);
+
+	return (int) buf_size;
 }
 
 

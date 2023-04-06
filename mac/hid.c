@@ -510,10 +510,11 @@ static struct hid_device_info *create_device_info_with_usage(IOHIDDeviceRef dev,
 	if (res == KERN_SUCCESS) {
 		/* max value of entry_id(uint64_t) is 18446744073709551615 which is 20 characters long,
 		   so for (max) "path" string 'DevSrvsID:18446744073709551615' we would need
-		   9+1+20+1=31 bytes byffer, but allocate 32 for simple alignment */
-		cur_dev->path = calloc(1, 32);
+		   9+1+20+1=31 bytes buffer, but allocate 32 for simple alignment */
+		const size_t path_len = 32;
+		cur_dev->path = calloc(1, path_len);
 		if (cur_dev->path != NULL) {
-			sprintf(cur_dev->path, "DevSrvsID:%llu", entry_id);
+			snprintf(cur_dev->path, path_len, "DevSrvsID:%llu", entry_id);
 		}
 	}
 
@@ -985,7 +986,7 @@ hid_device * HID_API_EXPORT hid_open_path(const char *path)
 
 	/* Create the Run Loop Mode for this device.
 	   printing the reference seems to work. */
-	sprintf(str, "HIDAPI_%p", (void*) dev->device_handle);
+	snprintf(str, sizeof(str), "HIDAPI_%p", (void*) dev->device_handle);
 	dev->run_loop_mode =
 		CFStringCreateWithCString(NULL, str, kCFStringEncodingASCII);
 
@@ -1428,6 +1429,33 @@ int HID_API_EXPORT_CALL hid_darwin_is_device_open_exclusive(hid_device *dev)
 		return -1;
 
 	return (dev->open_options == kIOHIDOptionsTypeSeizeDevice) ? 1 : 0;
+}
+
+int HID_API_EXPORT_CALL hid_get_report_descriptor(hid_device *dev, unsigned char *buf, size_t buf_size)
+{
+	CFTypeRef ref = IOHIDDeviceGetProperty(dev->device_handle, CFSTR(kIOHIDReportDescriptorKey));
+	if (ref != NULL && CFGetTypeID(ref) == CFDataGetTypeID()) {
+		CFDataRef report_descriptor = (CFDataRef) ref;
+		const UInt8 *descriptor_buf = CFDataGetBytePtr(report_descriptor);
+		CFIndex descriptor_buf_len = CFDataGetLength(report_descriptor);
+		size_t copy_len = (size_t) descriptor_buf_len;
+
+		if (descriptor_buf == NULL || descriptor_buf_len < 0) {
+			register_device_error(dev, "Zero buffer/length");
+			return -1;
+		}
+
+		if (buf_size < copy_len) {
+			copy_len = buf_size;
+		}
+
+		memcpy(buf, descriptor_buf, copy_len);
+		return copy_len;
+	}
+	else {
+		register_device_error(dev, "Failed to get kIOHIDReportDescriptorKey property");
+		return -1;
+	}
 }
 
 HID_API_EXPORT const wchar_t * HID_API_CALL  hid_error(hid_device *dev)
